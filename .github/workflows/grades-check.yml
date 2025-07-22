@@ -1,16 +1,27 @@
-name: PUPSIS Grade Watcher
+name: PUP Grade Watcher
 
 on:
   schedule:
-    - cron: "0 * * * *"  # runs every hour
+    - cron: "0 * * * *" # every hour, adjust if needed but think of ethical considerations :)
   workflow_dispatch:
 
 jobs:
   run-script:
+    name: Run PUP Grade Watcher
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check for .done file
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Restore `.done` from cache
+        id: cache-done
+        uses: actions/cache@v4
+        with:
+          path: .done
+          key: grade-done-main
+
+      - name: Check for `.done` file
         id: check_done
         run: |
           if [ -f ".done" ]; then
@@ -19,28 +30,32 @@ jobs:
             echo "done=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Skip if `.done` is present
+        if: steps.check_done.outputs.done == 'true'
+        run: echo "Grades already complete. Skipping."
+
+      - name: Restore `previous-grades.json` from cache
+        if: steps.check_done.outputs.done == 'false'
+        id: cache-grades
+        uses: actions/cache@v4
+        with:
+          path: previous-grades.json
+          key: grade-previous-main
 
       - name: Set up Python
+        if: steps.check_done.outputs.done == 'false'
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.check_done.outputs.done == 'false'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Restore previous grades cache
-        uses: actions/cache@v4
-        with:
-          path: previous-grades.json
-          key: grade-cache-main
-
-      - name: Run script
-        if: steps.check_done.outputs.done != 'true'
-        run: python scraper.py
+      - name: Run grade scraper
+        if: steps.check_done.outputs.done == 'false'
         env:
           STUDNO: ${{ secrets.STUDNO }}
           BIRTH_MONTH: ${{ secrets.BIRTH_MONTH }}
@@ -48,11 +63,18 @@ jobs:
           BIRTH_YEAR: ${{ secrets.BIRTH_YEAR }}
           PASSWORD: ${{ secrets.PASSWORD }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          EMAIL: ${{ secrets.EMAIL }}
+        run: python scraper.py
 
-      - name: Save updated grades cache
-        if: always()
-        uses: actions/cache/save@v4
+      - name: Save `.done` to cache
+        if: steps.check_done.outputs.done == 'false' && success()
+        uses: actions/cache@v4
+        with:
+          path: .done
+          key: grade-done-main
+
+      - name: Save `previous-grades.json` to cache
+        if: steps.check_done.outputs.done == 'false' && success()
+        uses: actions/cache@v4
         with:
           path: previous-grades.json
-          key: grade-cache-main
+          key: grade-previous-main
