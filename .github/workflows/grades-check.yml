@@ -2,7 +2,7 @@ name: PUPSIS Grade Watcher
 
 on:
   schedule:
-    - cron: "0 * * * *"  # runs every hour, modify as u see fit : ) 
+    - cron: "0 * * * *"  # runs every hour
   workflow_dispatch:
 
 jobs:
@@ -32,14 +32,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download previous-grades.json artifact
-        uses: actions/download-artifact@v4
+      - name: Restore previous grades cache
+        uses: actions/cache@v4
         with:
-          name: grades-cache
-        continue-on-error: true
+          path: previous-grades.json
+          key: grade-cache-main
 
       - name: Run script
-        run: python scraper.py  # or main.py
+        if: steps.check_done.outputs.done != 'true'
+        run: python scraper.py
         env:
           STUDNO: ${{ secrets.STUDNO }}
           BIRTH_MONTH: ${{ secrets.BIRTH_MONTH }}
@@ -49,9 +50,9 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL: ${{ secrets.EMAIL }}
 
-      - name: Upload updated previous-grades.json
+      - name: Save updated grades cache
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/cache/save@v4
         with:
-          name: grades-cache
           path: previous-grades.json
+          key: grade-cache-main
