@@ -210,3 +210,5 @@ __marimo__/
 
 # Grades output
 grades.json
+rendered_grades.html
+previous-grades.json
