@@ -2,7 +2,7 @@ name: PUP Grade Watcher
 
 on:
   schedule:
-    - cron: "0 * * * *" # every hour, adjust if needed but think of ethical considerations :)
+    - cron: "0 * * * *"  # every hour
   workflow_dispatch:
 
 jobs:
@@ -82,3 +82,13 @@ jobs:
         with:
           path: previous-grades.json
           key: grade-previous-main-${{ github.run_id }}
+
+      - name: Upload debug artifacts
+        if: steps.check_done.outputs.done == 'false' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grade-debug-artifacts
+          path: |
+            .done
+            previous-grades.json
+          retention-days: 1
