@@ -19,7 +19,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .done
-          key: grade-done-main
+          key: grade-done-main-${{ github.run_id }}
+          restore-keys: |
+            grade-done-main-
 
       - name: Check for `.done` file
         id: check_done
@@ -40,7 +42,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: previous-grades.json
-          key: grade-previous-main
+          key: grade-previous-main-${{ github.run_id }}
+          restore-keys: |
+            grade-previous-main-
 
       - name: Set up Python
         if: steps.check_done.outputs.done == 'false'
@@ -70,11 +74,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .done
-          key: grade-done-main
+          key: grade-done-main-${{ github.run_id }}
 
       - name: Save `previous-grades.json` to cache
         if: steps.check_done.outputs.done == 'false' && success()
         uses: actions/cache@v4
         with:
           path: previous-grades.json
-          key: grade-previous-main
+          key: grade-previous-main-${{ github.run_id }}
