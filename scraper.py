@@ -19,12 +19,13 @@ PASSWORD = os.getenv("PASSWORD")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL = os.getenv("EMAIL")
 
-
-
 LOGIN_URL = "https://sis1.pup.edu.ph/student/"
 GRADES_URL = "https://sis1.pup.edu.ph/student/grades"
 
 session = requests.Session()
+
+def grades_fully_released(grades):
+    return all(g.get("final_grade", "").strip() != "" for g in grades)
 
 # Step 1: GET login page
 response = session.get(LOGIN_URL)
@@ -88,6 +89,34 @@ if grades_table:
         json.dump(grades, f, indent=2, ensure_ascii=False)
 
     print("Grades saved to 'grades.json'")
+
+    # Check if all grades are complete
+    if grades_fully_released(grades):
+        print("All grades have been finalized.")
+        with open(".done", "w") as f:
+            f.write("Grades complete.")
+
+        # Send final email notice that this service will end
+        final_message = """
+        <p><strong>All your grades have been released!</strong></p>
+        <p>This is the final notification from the PUPSIS Grade Alert system. No further grade checks will be performed.</p>
+        <p>If more grades are added or you want to restart monitoring, delete the <code>.done</code> file in the repo or reset the cache.</p>
+        <hr>
+        <p>Thank you for using this service!</p>
+        """
+
+        resend.api_key = RESEND_API_KEY
+
+        response = resend.Emails.send({
+            "from": "onboarding@resend.dev",
+            "to": EMAIL,
+            "subject": "All Grades Released — Monitoring Complete",
+            "html": final_message
+        })
+
+        print("Final notification email sent. Monitoring ended.")
+        exit(0)
+
 else:
     print("Grades table not found.")
     exit()
@@ -105,18 +134,17 @@ if os.path.exists(prev_file):
         if not match:
             changes.append(f"New subject added: {curr['subject_code']} - {curr['description']}")
         elif curr["final_grade"] != match["final_grade"]:
-            changes.append(f"Grade updated for {curr['subject_code']}: {match['final_grade']} -> {curr['final_grade']}")
+            changes.append(f"Grade updated for {curr['description']}: {match['final_grade']} -> {curr['final_grade']}")
         elif curr["grade_status"] != match["grade_status"]:
-            changes.append(f"Status changed for {curr['subject_code']}: {match['grade_status']} -> {curr['grade_status']}")
+            changes.append(f"Status changed for {curr['description']}: {match['grade_status']} -> {curr['grade_status']}")
 
     if changes:
         print("\nChanges detected:")
         for c in changes:
             print("-", c)
 
-        # Render HTML only if changes exist
         def calculate_gwa(grades):
-            excluded_codes = {"CWTS 001", "PATHFIT 1", "PATHFIT 2", "PATHFIT 3", "PATHFIT 4"} # Subject Codes of subject not included on GWA Calculation
+            excluded_codes = {"CWTS 001", "PATHFIT 1", "PATHFIT 2", "PATHFIT 3", "PATHFIT 4"}
             total_units = 0
             total_weighted = 0
 
@@ -144,19 +172,15 @@ if os.path.exists(prev_file):
 
         print("Rendered grade report saved as 'rendered_grades.html'")
 
-        # Send rendered_grades.html via Resend
         with open("rendered_grades.html", "r", encoding="utf-8") as f:
             html_content = f.read()
 
-       # Build change summary in HTML
         change_summary = "<p><strong>The following grade updates were detected:</strong></p><ul>"
         for c in changes:
             change_summary += f"<li>{c}</li>"
         change_summary += "</ul>"
         change_summary += "<p>For context, here's your full grade report:</p><hr>"
 
-
-        # Combine summary + rendered report
         full_html = change_summary + html_content
 
         resend.api_key = RESEND_API_KEY
@@ -179,8 +203,7 @@ else:
 with open(prev_file, "w", encoding="utf-8") as f:
     json.dump(grades, f, indent=2, ensure_ascii=False)
 
-# Optional cleanup
-if os.path.exists("grades_page.html"):
-    os.remove("grades_page.html")
-if os.path.exists("rendered_grades.html"):
-    os.remove("rendered_grades.html")
+# Cleanup
+for file in ["grades_page.html", "rendered_grades.html"]:
+    if os.path.exists(file):
+        os.remove(file)
