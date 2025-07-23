@@ -67,6 +67,7 @@ jobs:
           BIRTH_YEAR: ${{ secrets.BIRTH_YEAR }}
           PASSWORD: ${{ secrets.PASSWORD }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL: ${{ secrets.EMAIL }}
         run: python scraper.py
 
       - name: Save `.done` to cache
